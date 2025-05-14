@@ -186,6 +186,31 @@ class ApiV3HfMarginOrderActiveSymbolsGET:
 
 
 @dataclass(frozen=True)
+class ApiV1StopOrderGET:
+    """https://www.kucoin.com/docs-new/rest/spot-trading/orders/get-stop-orders-list."""
+
+    @dataclass(frozen=True)
+    class Res:
+        """Parse response request."""
+
+        @dataclass(frozen=True)
+        class Data:
+            """."""
+
+            @dataclass(frozen=True)
+            class Item:
+                """."""
+
+                id: str
+
+            items: list[Item]
+
+        data: Data | str
+        code: str
+        msg: str | None
+
+
+@dataclass(frozen=True)
 class ApiV3HfMarginOrdersActiveGET:
     """https://www.kucoin.com/docs-new/rest/margin-trading/orders/get-open-orders."""
 
@@ -697,6 +722,41 @@ class KCN:
             for _ in self.logger_info(response_dict)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV3HfMarginOrderActiveSymbolsGET.Res,
+                response_dict,
+            )
+            for result in self.check_response_code(data_dataclass)
+        )
+
+    async def get_api_v1_stop_order(
+        self: Self,
+        params: dict[str, str],
+    ) -> Result[ApiV1StopOrderGET.Res, Exception]:
+        """Get Stop Orders List.
+
+        https://www.kucoin.com/docs-new/rest/spot-trading/orders/get-stop-orders-list
+        """
+        uri = "/api/v1/stop-order"
+        method = "GET"
+        return await do_async(
+            Ok(result)
+            for params_in_url in self.get_url_params_as_str(params)
+            for uri_params in self.cancatinate_str(uri, params_in_url)
+            for full_url in self.get_full_url(self.BASE_URL, uri_params)
+            for now_time in self.get_now_time()
+            for data_to_sign in self.cancatinate_str(now_time, method, uri_params)
+            for headers in self.get_headers_auth(
+                data_to_sign,
+                now_time,
+            )
+            for response_bytes in await self.request(
+                url=full_url,
+                method=method,
+                headers=headers,
+            )
+            for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for _ in self.logger_info(response_dict)
+            for data_dataclass in self.convert_to_dataclass_from_dict(
+                ApiV1StopOrderGET.Res,
                 response_dict,
             )
             for result in self.check_response_code(data_dataclass)
@@ -2307,12 +2367,10 @@ class KCN:
             for ticket in self.book:
                 match await do_async(
                     Ok(_)
-                    for _ in await self.delete_api_v3_hf_margin_orders_all(
-                        params={
-                            "symbol": ticket + "-USDT",
-                            "tradeType": "MARGIN_TRADE",
-                        }
+                    for s in await self.get_api_v1_stop_order(
+                        params={"symbol": ticket + "-USDT"}
                     )
+                    for _ in self.logger_success(s)
                     for candles in await self.get_last_200_hour_price_by_symbol(
                         ticket + "-USDT"
                     )

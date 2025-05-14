@@ -49,11 +49,6 @@ class AlertestToken:
 class Book:
     """Store data for each token."""
 
-    up_price: Decimal
-    price: Decimal
-    down_price: Decimal
-    liability: Decimal
-    available: Decimal
     baseincrement: Decimal
     priceincrement: Decimal
 
@@ -142,6 +137,19 @@ class ApiV2SymbolsGET:
             isMarginEnabled: bool
 
         data: list[Data]
+        code: str
+        msg: str | None
+
+
+@dataclass(frozen=True)
+class ApiV1MarketCandleGET:
+    """https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-klines."""
+
+    @dataclass(frozen=True)
+    class Res:
+        """Parse response request."""
+
+        data: list[list[str]]
         code: str
         msg: str | None
 
@@ -755,6 +763,37 @@ class KCN:
             for response_dict in self.parse_bytes_to_dict(response_bytes)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV2SymbolsGET.Res,
+                response_dict,
+            )
+            for result in self.check_response_code(data_dataclass)
+        )
+
+    async def get_api_v1_market_candle(
+        self: Self,
+        params: dict[str, str],
+    ) -> Result[ApiV2SymbolsGET.Res, Exception]:
+        """Get Klines.
+
+        weight 3
+
+        https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-klines
+        """
+        uri = "/api/v1/market/candles"
+        method = "GET"
+        return await do_async(
+            Ok(result)
+            for headers in self.get_headers_not_auth()
+            for params_in_url in self.get_url_params_as_str(params)
+            for uri_params in self.cancatinate_str(uri, params_in_url)
+            for full_url in self.get_full_url(self.BASE_URL, uri_params)
+            for response_bytes in await self.request(
+                url=full_url,
+                method=method,
+                headers=headers,
+            )
+            for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for data_dataclass in self.convert_to_dataclass_from_dict(
+                ApiV1MarketCandleGET.Res,
                 response_dict,
             )
             for result in self.check_response_code(data_dataclass)
@@ -2128,62 +2167,6 @@ class KCN:
         """Quantize to up."""
         return Ok(data.quantize(increment, ROUND_UP))
 
-    def calc_up(
-        self: Self,
-        ticket: str,
-    ) -> Result[OrderParam, Exception]:
-        """Calc up price and size tokens."""
-        return do(
-            Ok(
-                OrderParam(
-                    side="sell",
-                    price=price_str,
-                    size=size_str,
-                ),
-            )
-            for price_str in self.decimal_to_str(
-                self.book[ticket].up_price,
-            )
-            for raw_size in self.divide(
-                self.BASE_KEEP,
-                self.book[ticket].up_price,
-            )
-            for size in self.quantize_plus(
-                raw_size,
-                self.book[ticket].baseincrement,
-            )
-            for size_str in self.decimal_to_str(size)
-        )
-
-    def calc_down(
-        self: Self,
-        ticket: str,
-    ) -> Result[OrderParam, Exception]:
-        """Calc down price and size tokens."""
-        return do(
-            Ok(
-                OrderParam(
-                    side="buy",
-                    price=price_str,
-                    size=size_str,
-                ),
-            )
-            for price_str in self.decimal_to_str(
-                self.book[ticket].down_price,
-            )
-            for raw_size in self.divide(
-                self.BASE_KEEP,
-                self.book[ticket].down_price,
-            )
-            for size in self.quantize_plus(
-                min(
-                    raw_size, self.book[ticket].liability
-                ),  # min of size default order or liability
-                self.book[ticket].baseincrement,
-            )
-            for size_str in self.decimal_to_str(size)
-        )
-
     def plus_1_percent(self: Self, data: Decimal) -> Result[Decimal, Exception]:
         """Current price plus 1 percent."""
         try:
@@ -2257,7 +2240,6 @@ class KCN:
             for _ in self.init_envs()
             for _ in await self.create_db_pool()
             for _ in self.create_book()
-            for _ in await self.sleep_to(sleep_on=5)
             for _ in await self.fill_increment()
             for _ in self.logger_success(self.book)
         )
@@ -2267,67 +2249,74 @@ class KCN:
         await asyncio.sleep(sleep_on)
         return Ok(None)
 
-    async def repay_assets(self: Self) -> Result[None, Exception]:
-        """Repay all assets."""
+    async def get_last_200_hour_price_by_symbol(
+        self: Self,
+        symbol: str,
+    ) -> Result[list[list[str]], Exception]:
+        """."""
+        match await self.get_api_v1_market_candle(
+            params={
+                "symbol": symbol,
+                "type": "1hour",
+                "startAt": "1",
+                "endAt": "0",
+            }
+        ):
+            case Ok(candles):
+                return Ok(candles.data[:200])
+            case Err(exc):
+                logger.exception(exc)
+
+    def extract_close_price(
+        self: Self, data: list[list[str]]
+    ) -> Result[list[str], Exception]:
+        """."""
+        result = []
+        for close in data:
+            result.append(close[2])
+
+        return Ok(result)
+
+    def calc_MA(self: Self, data: list[str]) -> Result[Decimal, Exception]:
+        """."""
+        result = Decimal("0")
+
+        for close in data:
+            result += Decimal(close)
+
+        return Ok(result / len(data))
+
+    def get_current_price(self:Self, data:list[str]) -> Result[Decimal, Exception]:
+        """."""
+        return Ok(Decimal(data[0]))
+
+
+
+    async def gg(self: Self) -> Result[str, Exception]:
+        """."""
         while True:
-            for asset in self.book:
-                base_size = Decimal("0.01")
-                while True:
-                    match await do_async(
-                        Ok(_)
-                        for _ in await self.sleep_to(sleep_on=0.1)
-                        for raw_size in self.divide(
-                            base_size,
-                            self.book[asset].down_price,
-                        )
-                        for size in self.quantize_plus(
-                            raw_size,
-                            self.book[asset].baseincrement,
-                        )
-                        for _ in await self.post_api_v3_margin_repay(
-                            data={
-                                "currency": asset,
-                                "size": float(size),
-                                "isIsolated": False,
-                                "isHf": True,
-                            }
-                        )
-                        for _ in self.logger_success(f"Repay:{asset} on {size}")
-                    ):
-                        case Err(_):
-                            break
-                    base_size *= 2
-            base_size = Decimal("0.01")
-            while True:
+            for ticket in self.book:
                 match await do_async(
                     Ok(_)
-                    for _ in await self.sleep_to(sleep_on=0.1)
-                    for _ in await self.post_api_v3_margin_repay(
-                        data={
-                            "currency": "USDT",
-                            "size": float(base_size),
-                            "isIsolated": False,
-                            "isHf": True,
-                        }
+                    # close orders by symbol ticket
+                    for candles in await self.get_last_200_hour_price_by_symbol(
+                        ticket + "-USDT"
                     )
-                    for _ in self.logger_success(f"Repay:'USDT' on {base_size}")
-                ):
-                    case Err(_):
-                        break
-                base_size *= 2
+                    for close_prices in self.extract_close_price(candles)
+                    for current_price in self.get_current_price(close_prices)
+                    for ma in self.calc_MA(close_prices)
 
-        return Ok(None)
+                    for _ in self.logger_info(f"{ticket}\t{ma}\t{current_price}\t{current_price / ma}")  
+                ):
+                    case Ok(_):
+                        pass
+            await asyncio.sleep(60)
 
     async def infinity_task(self: Self) -> Result[None, Exception]:
         """Infinity run tasks."""
         async with asyncio.TaskGroup() as tg:
             tasks = [
-                # tg.create_task(self.position()),
-                # tg.create_task(self.candle()),
-                # tg.create_task(self.matching()),
-                # tg.create_task(self.alertest()),
-                # tg.create_task(self.repay_assets()),
-                # tg.create_task(self.close_redundant_orders()),
+                tg.create_task(self.gg()),
             ]
 
         for task in tasks:

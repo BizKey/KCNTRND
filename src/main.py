@@ -2509,9 +2509,8 @@ class KCN:
             case Ok(ma_):
                 match do(
                     Ok(size_)
-                    for new_size in self.divide(self.BASE_KEEP, ma_)
                     for size_ in self.quantize_down(
-                        Decimal(max(avail_tokens.available, new_size)),
+                        Decimal(avail_tokens.available),
                         self.book[ticket].baseincrement,
                     )
                 ):
@@ -2534,7 +2533,7 @@ class KCN:
                                     "type": "limit",
                                     "symbol": f"{ticket}-USDT",
                                     "side": "buy",
-                                    "size": str(size_),
+                                    "funds": str(self.BASE_KEEP),
                                     "price": str(ma_),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),

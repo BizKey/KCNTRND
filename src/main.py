@@ -2504,7 +2504,8 @@ class KCN:
                 match do(
                     Ok(size_)
                     for size_ in self.quantize_down(
-                        avail_tokens.available, self.book[ticket].baseincrement
+                        Decimal(avail_tokens.available),
+                        self.book[ticket].baseincrement,
                     )
                 ):
                     case Ok(size_):

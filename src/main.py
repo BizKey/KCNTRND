@@ -748,13 +748,13 @@ class KCN:
 
     async def delete_api_v1_stop_order_order_id(
         self: Self,
-        orderId: str,
+        order_id: str,
     ) -> Result[ApiV1StopOrderOrderIdDELETE.Res, Exception]:
         """Cancel Stop Order By OrderId.
 
         https://www.kucoin.com/docs-new/rest/spot-trading/orders/cancel-stop-order-by-orderld
         """
-        uri = f"/api/v1/stop-order/{orderId}"
+        uri = f"/api/v1/stop-order/{order_id}"
         method = "DELETE"
         return await do_async(
             Ok(result)
@@ -2338,7 +2338,7 @@ class KCN:
             match await do_async(
                 Ok(_)
                 for _ in await self.delete_api_v1_stop_order_order_id(
-                    orderId=item.id,
+                    order_id=item.id,
                 )
             ):
                 case Err(exc):
@@ -2394,18 +2394,15 @@ class KCN:
                 return Ok(candles.data[:200])
             case Err(exc):
                 logger.exception(exc)
+                return Err(exc)
 
     def extract_close_price(
         self: Self, data: list[list[str]]
     ) -> Result[list[str], Exception]:
         """."""
-        result = []
-        for close in data:
-            result.append(close[2])
+        return Ok([close[2] for close in data])
 
-        return Ok(result)
-
-    def calc_MA(self: Self, data: list[str]) -> Result[Decimal, Exception]:
+    def calc_ma(self: Self, data: list[str]) -> Result[Decimal, Exception]:
         """."""
         result = Decimal("0")
 
@@ -2447,7 +2444,7 @@ class KCN:
                     )
                     for close_prices in self.extract_close_price(candles)
                     for current_price in self.get_current_price(close_prices)
-                    for ma in self.calc_MA(close_prices)
+                    for ma in self.calc_ma(close_prices)
                     for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
                         params={
                             "quoteCurrency": "USDT",

@@ -2426,6 +2426,7 @@ class KCN:
         """."""
         for avail in data.data.accounts:
             if avail.currency == ticket:
+                logger.warning(avail)
                 return Ok(Decimal(avail.available))
         return Ok(Decimal("0"))
 
@@ -2447,14 +2448,16 @@ class KCN:
                     for close_prices in self.extract_close_price(candles)
                     for current_price in self.get_current_price(close_prices)
                     for ma in self.calc_MA(close_prices)
-                    #     for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
-                    #     params={
-                    #         "quoteCurrency": "USDT",
-                    #     },
-                    # )
-                    #     for avail_tokens in self.get_available_tokens(ticket, api_v3_margin_accounts)
+                    for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
+                        params={
+                            "quoteCurrency": "USDT",
+                        },
+                    )
+                    for avail_tokens in self.get_available_tokens(
+                        ticket, api_v3_margin_accounts
+                    )
                     for _ in self.logger_info(
-                        f"{ticket}\t{ma}\t{current_price}\t{current_price / ma}"
+                        f"{ticket=}\t{ma=}\t{current_price=}\t{current_price / ma:.2f}"
                     )
                 ):
                     case Ok(_):

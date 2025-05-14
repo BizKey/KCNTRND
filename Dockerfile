@@ -1,4 +1,4 @@
-FROM python:3.13.3-slim-bullseye AS builder
+FROM python:3.13.2-slim-bullseye AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 ENV UV_PYTHON_DOWNLOADS=0 \
@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ADD . /app
 
 
-FROM python:3.13.3-slim-bullseye AS runtime
+FROM python:3.13.2-slim-bullseye AS runtime
 
 COPY --from=builder --chown=app:app /app /app
 

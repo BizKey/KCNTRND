@@ -3,7 +3,7 @@ name = "kcn2"
 version = "0.1.0"
 description = "KCN2"
 readme = "README.md"
-requires-python = "==3.13.3"
+requires-python = "==3.13.2"
 package-mode = false
 
 dependencies = [

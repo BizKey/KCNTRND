@@ -2286,16 +2286,20 @@ class KCN:
 
         return Ok(result / len(data))
 
-    def get_current_price(self:Self, data:list[str]) -> Result[Decimal, Exception]:
+    def get_current_price(self: Self, data: list[str]) -> Result[Decimal, Exception]:
         """."""
         return Ok(Decimal(data[0]))
 
-    def get_available_tokens(self:Self,ticket:str,  data:ApiV3MarginAccountsGET.Res,) -> Result[Decimal, Exception]:
+    def get_available_tokens(
+        self: Self,
+        ticket: str,
+        data: ApiV3MarginAccountsGET.Res,
+    ) -> Result[Decimal, Exception]:
         """."""
         for avail in data.data.accounts:
             if avail.currency == ticket:
                 return Ok(Decimal(avail.available))
-        return Ok(Decimal('0'))        
+        return Ok(Decimal("0"))
 
     async def gg(self: Self) -> Result[str, Exception]:
         """."""
@@ -2303,25 +2307,31 @@ class KCN:
             for ticket in self.book:
                 match await do_async(
                     Ok(_)
-                    # close orders by symbol ticket
+                    for _ in await self.delete_api_v3_hf_margin_orders_all(
+                        params={
+                            "symbol": ticket + "-USDT",
+                            "tradeType": "MARGIN_TRADE",
+                        }
+                    )
                     for candles in await self.get_last_200_hour_price_by_symbol(
                         ticket + "-USDT"
                     )
                     for close_prices in self.extract_close_price(candles)
                     for current_price in self.get_current_price(close_prices)
                     for ma in self.calc_MA(close_prices)
-                    for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
-                    params={
-                        "quoteCurrency": "USDT",
-                    },
-                )
-                    for avail_tokens in self.get_available_tokens(ticket, api_v3_margin_accounts)
-
-                    for _ in self.logger_info(f"{ticket}\t{ma}\t{current_price}\t{current_price / ma}")  
+                    #     for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
+                    #     params={
+                    #         "quoteCurrency": "USDT",
+                    #     },
+                    # )
+                    #     for avail_tokens in self.get_available_tokens(ticket, api_v3_margin_accounts)
+                    for _ in self.logger_info(
+                        f"{ticket}\t{ma}\t{current_price}\t{current_price / ma}"
+                    )
                 ):
                     case Ok(_):
                         pass
-            await asyncio.sleep(60)
+            await asyncio.sleep(60 * 60)
 
     async def infinity_task(self: Self) -> Result[None, Exception]:
         """Infinity run tasks."""

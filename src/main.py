@@ -825,7 +825,6 @@ class KCN:
                 headers=headers,
             )
             for response_dict in self.parse_bytes_to_dict(response_bytes)
-            for _ in self.logger_info(response_dict)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV1StopOrderGET.Res,
                 response_dict,
@@ -2570,7 +2569,7 @@ class KCN:
                         current_price,
                         avail_tokens,
                     )
-                    for _ in self.logger_info(order_params)
+                    for _ in self.post_api_v1_stop_order(order_params)
                 ):
                     case Ok(_):
                         pass

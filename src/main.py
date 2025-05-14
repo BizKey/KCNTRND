@@ -2509,9 +2509,8 @@ class KCN:
             case Ok(ma_):
                 match do(
                     Ok(size_)
-                    for new_size in self.divide(self.BASE_KEEP, ma_)
                     for size_ in self.quantize_down(
-                        max(Decimal(avail_tokens.available), new_size),
+                        Decimal(avail_tokens.available),
                         self.book[ticket].baseincrement,
                     )
                 ):
@@ -2519,11 +2518,10 @@ class KCN:
                         if current_price > ma:
                             return Ok(
                                 {
-                                    "type": "limit",
+                                    "type": "market",
                                     "symbol": f"{ticket}-USDT",
                                     "side": "sell",
                                     "size": str(size_),
-                                    "price": str(ma_),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
                                 }
@@ -2531,11 +2529,10 @@ class KCN:
                         if current_price < ma:
                             return Ok(
                                 {
-                                    "type": "limit",
+                                    "type": "market",
                                     "symbol": f"{ticket}-USDT",
                                     "side": "buy",
-                                    "size": str(size_),
-                                    "price": str(ma_),
+                                    "funds": str(self.BASE_KEEP),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
                                 }
@@ -2557,6 +2554,7 @@ class KCN:
                     for orders in await self.get_api_v1_stop_order(
                         params={"symbol": ticket + "-USDT"}
                     )
+                    for _ in self.logger_success(orders)
                     for _ in await self.massive_delete_api_v1_stop_order_order_id(
                         orders
                     )

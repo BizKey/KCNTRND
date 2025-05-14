@@ -197,9 +197,9 @@ class ApiV1StopOrderOrderIdDELETE:
         class Data:
             """."""
 
-            cancelledOrderIds: str
+            cancelledOrderIds: list[str]
 
-        data: Data | str
+        data: Data
         code: str
         msg: str | None
 

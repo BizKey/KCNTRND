@@ -2537,7 +2537,7 @@ class KCN:
                                     "funds": str(self.BASE_KEEP),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
-                                    "stop": "loss",
+                                    "stop": "entry",
                                 }
                             )
                         return Err(Exception(""))

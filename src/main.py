@@ -186,6 +186,25 @@ class ApiV3HfMarginOrderActiveSymbolsGET:
 
 
 @dataclass(frozen=True)
+class ApiV1StopOrderOrderIdDELETE:
+    """https://www.kucoin.com/docs-new/rest/spot-trading/orders/cancel-stop-order-by-orderld."""
+
+    @dataclass(frozen=True)
+    class Res:
+        """Parse response request."""
+
+        @dataclass(frozen=True)
+        class Data:
+            """."""
+
+            cancelledOrderIds: str
+
+        data: Data | str
+        code: str
+        msg: str | None
+
+
+@dataclass(frozen=True)
 class ApiV1StopOrderGET:
     """https://www.kucoin.com/docs-new/rest/spot-trading/orders/get-stop-orders-list."""
 
@@ -730,7 +749,7 @@ class KCN:
     async def delete_api_v1_stop_order_order_id(
         self: Self,
         orderId: str,
-    ) -> Result[ApiV3HfMarginOrderActiveSymbolsGET.Res, Exception]:
+    ) -> Result[ApiV1StopOrderOrderIdDELETE.Res, Exception]:
         """Cancel Stop Order By OrderId.
 
         https://www.kucoin.com/docs-new/rest/spot-trading/orders/cancel-stop-order-by-orderld
@@ -754,7 +773,7 @@ class KCN:
             for response_dict in self.parse_bytes_to_dict(response_bytes)
             for _ in self.logger_info(response_dict)
             for data_dataclass in self.convert_to_dataclass_from_dict(
-                ApiV3HfMarginOrderActiveSymbolsGET.Res,
+                ApiV1StopOrderOrderIdDELETE.Res,
                 response_dict,
             )
             for result in self.check_response_code(data_dataclass)
@@ -2419,7 +2438,9 @@ class KCN:
                     for orders in await self.get_api_v1_stop_order(
                         params={"symbol": ticket + "-USDT"}
                     )
-                    for _ in await self.massive_delete_api_v1_stop_order_order_id(orders)
+                    for _ in await self.massive_delete_api_v1_stop_order_order_id(
+                        orders
+                    )
                     for candles in await self.get_last_200_hour_price_by_symbol(
                         ticket + "-USDT"
                     )

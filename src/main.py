@@ -825,6 +825,7 @@ class KCN:
                 headers=headers,
             )
             for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for _ in self.logger_info(response_dict)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV1StopOrderGET.Res,
                 response_dict,
@@ -2554,7 +2555,6 @@ class KCN:
                     for orders in await self.get_api_v1_stop_order(
                         params={"symbol": ticket + "-USDT"}
                     )
-                    for _ in self.logger_success(orders)
                     for _ in await self.massive_delete_api_v1_stop_order_order_id(
                         orders
                     )

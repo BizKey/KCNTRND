@@ -845,11 +845,17 @@ class KCN:
         logger.warning(params)
         return await do_async(
             Ok(result)
-            for params_in_url in self.get_url_params_as_str(params)
-            for uri_params in self.cancatinate_str(uri, params_in_url)
-            for full_url in self.get_full_url(self.BASE_URL, uri_params)
+            for _ in self.logger_info(f"Margin stop order:{params}")
+            for full_url in self.get_full_url(self.BASE_URL, uri)
+            for dumps_data_bytes in self.dumps_dict_to_bytes(params)
+            for dumps_data_str in self.decode(dumps_data_bytes)
             for now_time in self.get_now_time()
-            for data_to_sign in self.cancatinate_str(now_time, method, uri_params)
+            for data_to_sign in self.cancatinate_str(
+                now_time,
+                method,
+                uri,
+                dumps_data_str,
+            )
             for headers in self.get_headers_auth(
                 data_to_sign,
                 now_time,
@@ -858,6 +864,7 @@ class KCN:
                 url=full_url,
                 method=method,
                 headers=headers,
+                data=dumps_data_bytes,
             )
             for response_dict in self.parse_bytes_to_dict(response_bytes)
             for _ in self.logger_info(response_dict)

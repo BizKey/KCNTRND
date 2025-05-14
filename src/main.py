@@ -2569,7 +2569,7 @@ class KCN:
                         current_price,
                         avail_tokens,
                     )
-                    for _ in self.post_api_v1_stop_order(order_params)
+                    for _ in await self.post_api_v1_stop_order(order_params)
                 ):
                     case Ok(_):
                         pass

@@ -2518,10 +2518,11 @@ class KCN:
                         if current_price > ma:
                             return Ok(
                                 {
-                                    "type": "market",
+                                    "type": "limit",
                                     "symbol": f"{ticket}-USDT",
                                     "side": "sell",
                                     "size": str(size_),
+                                    "price": str(ma_),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
                                 }
@@ -2529,10 +2530,11 @@ class KCN:
                         if current_price < ma:
                             return Ok(
                                 {
-                                    "type": "market",
+                                    "type": "limit",
                                     "symbol": f"{ticket}-USDT",
                                     "side": "buy",
                                     "funds": str(self.BASE_KEEP),
+                                    "price": str(ma_),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
                                 }

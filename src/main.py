@@ -205,7 +205,7 @@ class ApiV1StopOrderGET:
 
             items: list[Item]
 
-        data: Data | str
+        data: Data
         code: str
         msg: str | None
 
@@ -709,6 +709,39 @@ class KCN:
             for full_url in self.get_full_url(self.BASE_URL, uri_params)
             for now_time in self.get_now_time()
             for data_to_sign in self.cancatinate_str(now_time, method, uri_params)
+            for headers in self.get_headers_auth(
+                data_to_sign,
+                now_time,
+            )
+            for response_bytes in await self.request(
+                url=full_url,
+                method=method,
+                headers=headers,
+            )
+            for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for _ in self.logger_info(response_dict)
+            for data_dataclass in self.convert_to_dataclass_from_dict(
+                ApiV3HfMarginOrderActiveSymbolsGET.Res,
+                response_dict,
+            )
+            for result in self.check_response_code(data_dataclass)
+        )
+
+    async def delete_api_v1_stop_order_order_id(
+        self: Self,
+        orderId: str,
+    ) -> Result[ApiV3HfMarginOrderActiveSymbolsGET.Res, Exception]:
+        """Cancel Stop Order By OrderId.
+
+        https://www.kucoin.com/docs-new/rest/spot-trading/orders/cancel-stop-order-by-orderld
+        """
+        uri = f"/api/v1/stop-order/{orderId}"
+        method = "DELETE"
+        return await do_async(
+            Ok(result)
+            for full_url in self.get_full_url(self.BASE_URL, uri)
+            for now_time in self.get_now_time()
+            for data_to_sign in self.cancatinate_str(now_time, method, uri)
             for headers in self.get_headers_auth(
                 data_to_sign,
                 now_time,
@@ -2277,6 +2310,22 @@ class KCN:
         except ConnectionRefusedError as exc:
             return Err(exc)
 
+    async def massive_delete_api_v1_stop_order_order_id(
+        self: Self,
+        data: ApiV1StopOrderGET.Res,
+    ) -> Result[str, Exception]:
+        """."""
+        for item in data.data.items:
+            match await do_async(
+                Ok(_)
+                for _ in await self.delete_api_v1_stop_order_order_id(
+                    orderId=item.id,
+                )
+            ):
+                case Err(exc):
+                    logger.exception(exc)
+        return Ok(None)
+
     async def massive_delete_order_by_symbol(self: Self) -> Result[None, Exception]:
         """."""
         for symbol in self.book:
@@ -2367,10 +2416,10 @@ class KCN:
             for ticket in self.book:
                 match await do_async(
                     Ok(_)
-                    for s in await self.get_api_v1_stop_order(
+                    for orders in await self.get_api_v1_stop_order(
                         params={"symbol": ticket + "-USDT"}
                     )
-                    for _ in self.logger_success(s)
+                    for _ in self.massive_delete_api_v1_stop_order_order_id(orders)
                     for candles in await self.get_last_200_hour_price_by_symbol(
                         ticket + "-USDT"
                     )

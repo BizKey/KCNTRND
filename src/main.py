@@ -1459,7 +1459,6 @@ class KCN:
                     asyncio.create_task(self.order_matching(data.data))
         return Ok(None)
 
-
     async def processing_ws_candle(
         self: Self, msg: str | bytes
     ) -> Result[None, Exception]:
@@ -1943,7 +1942,6 @@ class KCN:
                 logger.exception(exc)
         return Ok(None)
 
-
     async def make_sell_margin_order(
         self: Self,
         ticket: str,
@@ -2085,9 +2083,6 @@ class KCN:
         except IndexError as exc:
             return Err(exc)
         return Ok(None)
-
-
-
 
     def fill_all_price(
         self: Self,
@@ -2256,12 +2251,7 @@ class KCN:
         return Ok(None)
 
     async def pre_init(self: Self) -> Result[Self, Exception]:
-        """Pre-init.
-
-        get all open orders
-        close all open orders
-        get increment by all tickets
-        """
+        """Pre-init."""
         return await do_async(
             Ok(self)
             for _ in self.init_envs()
@@ -2327,7 +2317,6 @@ class KCN:
                 base_size *= 2
 
         return Ok(None)
-
 
     async def infinity_task(self: Self) -> Result[None, Exception]:
         """Infinity run tasks."""

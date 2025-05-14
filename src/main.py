@@ -2511,7 +2511,7 @@ class KCN:
                     Ok(size_)
                     for new_size in self.divide(self.BASE_KEEP, ma_)
                     for size_ in self.quantize_down(
-                        Decimal(max(avail_tokens.available, new_size)),
+                        max(Decimal(avail_tokens.available), new_size),
                         self.book[ticket].baseincrement,
                     )
                 ):

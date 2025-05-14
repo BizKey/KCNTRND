@@ -2525,6 +2525,7 @@ class KCN:
                                     "size": str(size_),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
+                                    "stop": "loss",
                                 }
                             )
                         if current_price < ma:
@@ -2536,6 +2537,7 @@ class KCN:
                                     "funds": str(self.BASE_KEEP),
                                     "stopPrice": str(ma_),
                                     "clientOid": str(uuid4()).replace("-", ""),
+                                    "stop": "loss",
                                 }
                             )
                         return Err(Exception(""))

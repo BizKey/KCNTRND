@@ -6,7 +6,7 @@ import socket
 from base64 import b64encode
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import ROUND_UP, Decimal, InvalidOperation
+from decimal import ROUND_DOWN, ROUND_UP, Decimal, InvalidOperation
 from hashlib import sha256
 from hmac import HMAC
 from hmac import new as hmac_new
@@ -223,6 +223,25 @@ class ApiV1StopOrderGET:
                 id: str
 
             items: list[Item]
+
+        data: Data
+        code: str
+        msg: str | None
+
+
+@dataclass(frozen=True)
+class ApiV1StopOrderPOST:
+    """https://www.kucoin.com/docs-new/rest/spot-trading/orders/add-stop-order."""
+
+    @dataclass(frozen=True)
+    class Res:
+        """Parse response request."""
+
+        @dataclass(frozen=True)
+        class Data:
+            """."""
+
+            orderId: str
 
         data: Data
         code: str
@@ -809,6 +828,42 @@ class KCN:
             for _ in self.logger_info(response_dict)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV1StopOrderGET.Res,
+                response_dict,
+            )
+            for result in self.check_response_code(data_dataclass)
+        )
+
+    async def post_api_v1_stop_order(
+        self: Self,
+        params: dict[str, str],
+    ) -> Result[ApiV1StopOrderPOST.Res, Exception]:
+        """Add Stop Order.
+
+        https://www.kucoin.com/docs-new/rest/spot-trading/orders/add-stop-order
+        """
+        uri = "/api/v1/stop-order"
+        method = "POST"
+        logger.warning(params)
+        return await do_async(
+            Ok(result)
+            for params_in_url in self.get_url_params_as_str(params)
+            for uri_params in self.cancatinate_str(uri, params_in_url)
+            for full_url in self.get_full_url(self.BASE_URL, uri_params)
+            for now_time in self.get_now_time()
+            for data_to_sign in self.cancatinate_str(now_time, method, uri_params)
+            for headers in self.get_headers_auth(
+                data_to_sign,
+                now_time,
+            )
+            for response_bytes in await self.request(
+                url=full_url,
+                method=method,
+                headers=headers,
+            )
+            for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for _ in self.logger_info(response_dict)
+            for data_dataclass in self.convert_to_dataclass_from_dict(
+                ApiV1StopOrderPOST.Res,
                 response_dict,
             )
             for result in self.check_response_code(data_dataclass)
@@ -2279,6 +2334,14 @@ class KCN:
         """Quantize to up."""
         return Ok(data.quantize(increment, ROUND_UP))
 
+    def quantize_down(
+        self: Self,
+        data: Decimal,
+        increment: Decimal,
+    ) -> Result[Decimal, Exception]:
+        """Quantize to up."""
+        return Ok(data.quantize(increment, ROUND_DOWN))
+
     def plus_1_percent(self: Self, data: Decimal) -> Result[Decimal, Exception]:
         """Current price plus 1 percent."""
         try:
@@ -2419,13 +2482,59 @@ class KCN:
         self: Self,
         ticket: str,
         data: ApiV3MarginAccountsGET.Res,
-    ) -> Result[Decimal, Exception]:
+    ) -> Result[ApiV3MarginAccountsGET.Res.Data.Account, Exception]:
         """."""
         for avail in data.data.accounts:
             if avail.currency == ticket:
-                logger.warning(avail)
-                return Ok(Decimal(avail.available))
-        return Ok(Decimal("0"))
+                return Ok(avail)
+        return Err(Exception(""))
+
+    def logic_(
+        self: Self,
+        ticket: str,
+        ma: Decimal,
+        current_price: Decimal,
+        avail_tokens: ApiV3MarginAccountsGET.Res.Data.Account,
+    ) -> Result[dict, Exception]:
+        """."""
+        match do(
+            Ok(ma_) for ma_ in self.quantize_down(ma, self.book[ticket].priceincrement)
+        ):
+            case Ok(ma_):
+                match do(
+                    Ok(size_)
+                    for size_ in self.quantize_down(
+                        avail_tokens.available, self.book[ticket].baseincrement
+                    )
+                ):
+                    case Ok(size_):
+                        if current_price > ma:
+                            return Ok(
+                                {
+                                    "type": "market",
+                                    "symbol": f"{ticket}-USDT",
+                                    "side": "sell",
+                                    "size": str(size_),
+                                    "stopPrice": str(ma_),
+                                }
+                            )
+                        if current_price < ma:
+                            return Ok(
+                                {
+                                    "type": "market",
+                                    "symbol": f"{ticket}-USDT",
+                                    "side": "buy",
+                                    "funds": str(self.BASE_KEEP),
+                                    "stopPrice": str(ma_),
+                                }
+                            )
+                        return Err(Exception(""))
+                    case Err(exc):
+                        logger.exception(exc)
+                        return Err(exc)
+            case Err(exc):
+                logger.exception(exc)
+                return Err(exc)
 
     async def gg(self: Self) -> Result[str, Exception]:
         """."""
@@ -2451,11 +2560,16 @@ class KCN:
                         },
                     )
                     for avail_tokens in self.get_available_tokens(
-                        ticket, api_v3_margin_accounts
+                        ticket,
+                        api_v3_margin_accounts,
                     )
-                    for _ in self.logger_info(
-                        f"{ticket=}\t{ma=}\t{current_price=}\t{current_price / ma:.2f}"
+                    for order_params in self.logic_(
+                        ticket,
+                        ma,
+                        current_price,
+                        avail_tokens,
                     )
+                    for _ in self.logger_info(order_params)
                 ):
                     case Ok(_):
                         pass

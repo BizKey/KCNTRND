@@ -589,6 +589,7 @@ class KCN:
 
     async def get_api_v1_accounts(
         self: Self,
+        params: dict[str, str],
     ) -> Result[ApiV1AccountsGET.Res, Exception]:
         """Get Account List - Spot.
 
@@ -600,9 +601,11 @@ class KCN:
         method = "GET"
         return await do_async(
             Ok(result)
-            for full_url in self.get_full_url(self.BASE_URL, uri)
+            for params_in_url in self.get_url_params_as_str(params)
+            for uri_params in self.cancatinate_str(uri, params_in_url)
+            for full_url in self.get_full_url(self.BASE_URL, uri_params)
             for now_time in self.get_now_time()
-            for data_to_sign in self.cancatinate_str(now_time, method, uri)
+            for data_to_sign in self.cancatinate_str(now_time, method, uri_params)
             for headers in self.get_headers_auth(
                 data_to_sign,
                 now_time,
@@ -1271,7 +1274,33 @@ class KCN:
         """."""
         match await do_async(
             Ok(_)
-            for g in await self.get_api_v1_accounts()
+            for g in await self.get_api_v1_accounts(
+                {
+                    "currency": "BTC",
+                    "type": "trade",
+                }
+            )
+            for _ in self.logger_success(g)
+            for g in await self.get_api_v1_accounts(
+                {
+                    "currency": "ETH",
+                    "type": "trade",
+                }
+            )
+            for _ in self.logger_success(g)
+            for g in await self.get_api_v1_accounts(
+                {
+                    "currency": "SOL",
+                    "type": "trade",
+                }
+            )
+            for _ in self.logger_success(g)
+            for g in await self.get_api_v1_accounts(
+                {
+                    "currency": "ADA",
+                    "type": "trade",
+                }
+            )
             for _ in self.logger_success(g)
         ):
             case Err(exc):

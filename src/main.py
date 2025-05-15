@@ -5,7 +5,7 @@ import asyncio
 from base64 import b64encode
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import ROUND_DOWN, ROUND_UP, Decimal, InvalidOperation
+from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from hashlib import sha256
 from hmac import HMAC
 from hmac import new as hmac_new
@@ -1033,14 +1033,6 @@ class KCN:
             return Err(ZeroDivisionError("Divisor cannot be zero"))
         return Ok(divider / divisor)
 
-    def quantize_plus(
-        self: Self,
-        data: Decimal,
-        increment: Decimal,
-    ) -> Result[Decimal, Exception]:
-        """Quantize to up."""
-        return Ok(data.quantize(increment, ROUND_UP))
-
     def quantize_down(
         self: Self,
         data: Decimal,
@@ -1112,9 +1104,10 @@ class KCN:
             for _ in self.logger_success(self.book)
         )
 
-    async def get_last_200_hour_price_by_symbol(
+    async def get_last_hour_price_by_symbol(
         self: Self,
         symbol: str,
+        cut: int,
     ) -> Result[list[list[str]], Exception]:
         """."""
         match await self.get_api_v1_market_candle(
@@ -1126,7 +1119,7 @@ class KCN:
             }
         ):
             case Ok(candles):
-                return Ok(candles.data[:200])
+                return Ok(candles.data[:cut])
             case Err(exc):
                 logger.exception(exc)
                 return Err(exc)
@@ -1147,10 +1140,6 @@ class KCN:
 
         return Ok(result / len(data))
 
-    def get_current_price(self: Self, data: list[str]) -> Result[Decimal, Exception]:
-        """."""
-        return Ok(Decimal(data[0]))
-
     def get_available_tokens(
         self: Self,
         ticket: str,
@@ -1166,7 +1155,6 @@ class KCN:
         self: Self,
         ticket: str,
         ma: Decimal,
-        current_price: Decimal,
         avail_tokens: ApiV3MarginAccountsGET.Res.Data.Account,
     ) -> Result[dict[str, str], Exception]:
         """."""
@@ -1182,30 +1170,37 @@ class KCN:
                     )
                 ):
                     case Ok(size_):
-                        if current_price > ma:
-                            return Ok(
-                                {
-                                    "type": "market",
-                                    "symbol": f"{ticket}-USDT",
-                                    "side": "sell",
-                                    "size": str(size_),
-                                    "stopPrice": str(ma_),
-                                    "clientOid": str(uuid4()).replace("-", ""),
-                                    "stop": "loss",
-                                }
+                        if size_ == 0:
+                            return do(
+                                Ok(
+                                    {
+                                        "type": "market",
+                                        "symbol": f"{ticket}-USDT",
+                                        "side": "buy",
+                                        "funds": str(self.BASE_KEEP),
+                                        "stopPrice": str(ma_),
+                                        "clientOid": client_O_id,
+                                        "stop": "entry",
+                                    }
+                                )
+                                for client_O_id in self.get_uuid4()
                             )
-                        if current_price < ma:
-                            return Ok(
-                                {
-                                    "type": "market",
-                                    "symbol": f"{ticket}-USDT",
-                                    "side": "buy",
-                                    "funds": str(self.BASE_KEEP),
-                                    "stopPrice": str(ma_),
-                                    "clientOid": str(uuid4()).replace("-", ""),
-                                    "stop": "entry",
-                                }
+                        if size_ > 0:
+                            return do(
+                                Ok(
+                                    {
+                                        "type": "market",
+                                        "symbol": f"{ticket}-USDT",
+                                        "side": "sell",
+                                        "size": str(size_),
+                                        "stopPrice": str(ma_),
+                                        "clientOid": client_O_id,
+                                        "stop": "loss",
+                                    }
+                                )
+                                for client_O_id in self.get_uuid4()
                             )
+
                         return Err(Exception(""))
                     case Err(exc):
                         logger.exception(exc)
@@ -1227,11 +1222,11 @@ class KCN:
                     for _ in await self.massive_delete_api_v1_stop_order_order_id(
                         orders
                     )
-                    for candles in await self.get_last_200_hour_price_by_symbol(
-                        ticket + "-USDT"
+                    for candles in await self.get_last_hour_price_by_symbol(
+                        ticket + "-USDT",
+                        200,
                     )
                     for close_prices in self.extract_close_price(candles)
-                    for current_price in self.get_current_price(close_prices)
                     for ma in self.calc_ma(close_prices)
                     for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
                         params={
@@ -1245,13 +1240,13 @@ class KCN:
                     for order_params in self.logic_(
                         ticket,
                         ma,
-                        current_price,
                         avail_tokens,
                     )
                     for _ in await self.post_api_v1_stop_order(order_params)
                 ):
-                    case Ok(_):
-                        pass
+                    case Err(exc):
+                        logger.exception(exc)
+
             await asyncio.sleep(60 * 60)
 
     async def infinity_task(self: Self) -> Result[None, Exception]:

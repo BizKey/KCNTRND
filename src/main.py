@@ -1215,17 +1215,26 @@ class KCN:
         self: Self,
         ticket: str,
         ma: Decimal,
-        avail_tokens: ApiV3MarginAccountsGET.Res.Data.Account,
+        avail_tokens: ApiV1AccountsGET.Res,
     ) -> Result[dict[str, str], Exception]:
         """."""
+        if len(avail_tokens.data) == 0:
+            avail_tokens_s = "0"
+        else:
+            avail_tokens_s = avail_tokens.data[0].balance
+
         match do(
-            Ok(ma_) for ma_ in self.quantize_down(ma, self.book[ticket].priceincrement)
+            Ok(ma_)
+            for ma_ in self.quantize_down(
+                ma,
+                self.book[ticket].priceincrement,
+            )
         ):
             case Ok(ma_):
                 match do(
                     Ok(size_)
                     for size_ in self.quantize_down(
-                        Decimal(avail_tokens.available),
+                        Decimal(avail_tokens_s),
                         self.book[ticket].baseincrement,
                     )
                 ):
@@ -1272,39 +1281,6 @@ class KCN:
 
     async def gg(self: Self) -> Result[str, Exception]:
         """."""
-        match await do_async(
-            Ok(_)
-            for g in await self.get_api_v1_accounts(
-                {
-                    "currency": "BTC",
-                    "type": "trade",
-                }
-            )
-            for _ in self.logger_success(g)
-            for g in await self.get_api_v1_accounts(
-                {
-                    "currency": "ETH",
-                    "type": "trade",
-                }
-            )
-            for _ in self.logger_success(g)
-            for g in await self.get_api_v1_accounts(
-                {
-                    "currency": "SOL",
-                    "type": "trade",
-                }
-            )
-            for _ in self.logger_success(g)
-            for g in await self.get_api_v1_accounts(
-                {
-                    "currency": "ADA",
-                    "type": "trade",
-                }
-            )
-            for _ in self.logger_success(g)
-        ):
-            case Err(exc):
-                logger.exception(exc)
         while True:
             now = datetime.now()
             target_time = now.replace(minute=1, second=0, microsecond=0) + timedelta(
@@ -1327,19 +1303,16 @@ class KCN:
                     )
                     for close_prices in self.extract_close_price(candles)
                     for ma in self.calc_ma(close_prices)
-                    for api_v3_margin_accounts in await self.get_api_v3_margin_accounts(
-                        params={
-                            "quoteCurrency": "USDT",
-                        },
-                    )
-                    for avail_tokens in self.get_available_tokens(
-                        ticket,
-                        api_v3_margin_accounts,
+                    for account_token_info in await self.get_api_v1_accounts(
+                        {
+                            "currency": ticket,
+                            "type": "trade",
+                        }
                     )
                     for order_params in self.logic_(
                         ticket,
                         ma,
-                        avail_tokens,
+                        account_token_info,
                     )
                     for _ in await self.post_api_v1_stop_order(order_params)
                 ):

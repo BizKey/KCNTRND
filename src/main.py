@@ -4,7 +4,7 @@
 import asyncio
 from base64 import b64encode
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from hashlib import sha256
 from hmac import HMAC
@@ -1056,7 +1056,7 @@ class KCN:
                     data.side,
                     data.matchSize or "",
                     data.matchPrice,
-                    datetime.now(),  # noqa: DTZ005
+                    datetime.now(),
                 )
         except Exception as exc:  # noqa: BLE001
             logger.exception(exc)
@@ -1213,6 +1213,12 @@ class KCN:
     async def gg(self: Self) -> Result[str, Exception]:
         """."""
         while True:
+            now = datetime.now()
+            target_time = now.replace(minute=1, second=0, microsecond=0) + timedelta(
+                hours=1
+            )
+            delay = (target_time - now).total_seconds()
+            await asyncio.sleep(delay)
             for ticket in self.book:
                 match await do_async(
                     Ok(_)

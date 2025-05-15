@@ -31,7 +31,15 @@ addopts = "--cov=src --cov-report term-missing"
 
 [tool.ruff]
 lint.select = ["ALL"]
-lint.ignore = ["N815", "E501", "COM812", "RUF006", "PLR0912", "EXE001"]
+lint.ignore = [
+    "N815",
+    "E501",
+    "COM812",
+    "RUF006",
+    "PLR0912",
+    "EXE001",
+    "DTZ005",
+]
 lint.fixable = ["ALL"]
 lint.mccabe.max-complexity = 19
 lint.pydocstyle.convention = "google"

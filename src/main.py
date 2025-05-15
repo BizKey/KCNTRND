@@ -1295,6 +1295,13 @@ class KCN:
                 }
             )
             for _ in self.logger_success(g)
+            for g in await self.get_api_v1_accounts(
+                {
+                    "currency": "ADA",
+                    "type": "trade",
+                }
+            )
+            for _ in self.logger_success(g)
         ):
             case Err(exc):
                 logger.exception(exc)

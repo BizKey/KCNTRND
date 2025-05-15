@@ -1253,8 +1253,6 @@ class KCN:
                     case Err(exc):
                         logger.exception(exc)
 
-            await asyncio.sleep(60 * 60)
-
     async def infinity_task(self: Self) -> Result[None, Exception]:
         """Infinity run tasks."""
         async with asyncio.TaskGroup() as tg:

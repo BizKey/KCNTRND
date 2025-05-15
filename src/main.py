@@ -180,6 +180,30 @@ class ApiV3MarginAccountsGET:
 
 
 @dataclass(frozen=True)
+class ApiV1AccountsGET:
+    """https://www.kucoin.com/docs-new/rest/account-info/account-funding/get-account-list-spot."""
+
+    @dataclass(frozen=True)
+    class Res:
+        """Parse response request."""
+
+        @dataclass(frozen=True)
+        class Data:
+            """."""
+
+            id: str
+            currency: str
+            type: str
+            balance: str
+            available: str
+            holds: str
+
+        data: list[Data]
+        code: str
+        msg: str | None
+
+
+@dataclass(frozen=True)
 class OrderChangeV2:
     """."""
 
@@ -558,6 +582,39 @@ class KCN:
             for response_dict in self.parse_bytes_to_dict(response_bytes)
             for data_dataclass in self.convert_to_dataclass_from_dict(
                 ApiV3MarginAccountsGET.Res,
+                response_dict,
+            )
+            for result in self.check_response_code(data_dataclass)
+        )
+
+    async def get_api_v1_accounts(
+        self: Self,
+    ) -> Result[ApiV1AccountsGET.Res, Exception]:
+        """Get Account List - Spot.
+
+        weight 5
+
+        https://www.kucoin.com/docs-new/rest/account-info/account-funding/get-account-list-spot
+        """
+        uri = "/api/v1/accounts"
+        method = "GET"
+        return await do_async(
+            Ok(result)
+            for full_url in self.get_full_url(self.BASE_URL, uri)
+            for now_time in self.get_now_time()
+            for data_to_sign in self.cancatinate_str(now_time, method, uri)
+            for headers in self.get_headers_auth(
+                data_to_sign,
+                now_time,
+            )
+            for response_bytes in await self.request(
+                url=full_url,
+                method=method,
+                headers=headers,
+            )
+            for response_dict in self.parse_bytes_to_dict(response_bytes)
+            for data_dataclass in self.convert_to_dataclass_from_dict(
+                ApiV1AccountsGET.Res,
                 response_dict,
             )
             for result in self.check_response_code(data_dataclass)
@@ -1212,6 +1269,13 @@ class KCN:
 
     async def gg(self: Self) -> Result[str, Exception]:
         """."""
+        match await do_async(
+            Ok(_)
+            for g in await self.get_api_v1_accounts()
+            for _ in self.logger_success(g)
+        ):
+            case Err(exc):
+                logger.exception(exc)
         while True:
             now = datetime.now()
             target_time = now.replace(minute=1, second=0, microsecond=0) + timedelta(
